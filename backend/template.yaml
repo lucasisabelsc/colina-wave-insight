@@ -6,7 +6,7 @@ Description: >
 Globals:
   Function:
     Timeout: 3
-    Runtime: python3.13
+    Runtime: python3.12
     Architectures:
       - x86_64
 
@@ -18,40 +18,60 @@ Parameters:
 Resources:
 
   # API nomeada e reutilizável
-  MyApi:
+  CrmApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub "${StageName}-MyApi"
+      Name: !Sub "${StageName}-CrmApi"
       StageName: !Ref StageName
       Cors:
         AllowMethods: "'OPTIONS,GET,POST,PUT,DELETE'"
         AllowHeaders: "'*'"
         AllowOrigin: "'*'"
 
-  # Lambda de exemplo
-  HelloWorldFunction:
+  AlertsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: hello_world/
+      CodeUri: alerts/
       Handler: app.lambda_handler
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: "*"
       Events:
-        HelloWorld:
+        AlertsGet:
           Type: Api
           Properties:
-            Path: /hello
+            Path: /alerts
             Method: get
-            RestApiId: !Ref MyApi
+            RestApiId: !Ref CrmApi
 
-Outputs:
-
-  HelloWorldEndpoint:
-    Description: "Endpoint da função HelloWorld"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/hello"
-
-  HelloWorldFunctionArn:
-    Description: "ARN da Lambda HelloWorld"
-    Value: !GetAtt HelloWorldFunction.Arn
-
-  HelloWorldFunctionRole:
-    Description: "IAM Role criada implicitamente para a HelloWorldFunction"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  MetricsTodayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: metricsToday/
+      Handler: app.lambda_handler
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: "*"
+      Events:
+        MetricsTodayGet:
+          Type: Api
+          Properties:
+            Path: /metrics/today
+            Method: get
+            RestApiId: !Ref CrmApi

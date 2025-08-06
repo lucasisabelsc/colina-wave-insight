@@ -11,6 +11,11 @@ import {
   Zap
 } from "lucide-react";
 
+import { useEffect, useState } from "react";
+import { getAlerts } from "@/services/alerts";
+
+
+
 // Mock data - Em produção virá do DynamoDB
 const mockMetrics = [
   {
@@ -40,33 +45,6 @@ const mockMetrics = [
     change: { value: 3, type: "increase" as const },
     icon: AlertTriangle,
     variant: "destructive" as const
-  }
-];
-
-const mockAlerts = [
-  {
-    groupName: "Cliente Alpha - Projeto Site",
-    clientName: "João Silva",
-    lastMessage: "Precisamos revisar as cores do layout antes do deadline de sexta-feira",
-    waitingTime: "2h 15min",
-    priority: "high" as const,
-    messageCount: 3
-  },
-  {
-    groupName: "Beta Corp - Campanhas Google",
-    clientName: "Maria Santos",
-    lastMessage: "Quando vamos revisar os resultados da campanha?",
-    waitingTime: "45min",
-    priority: "medium" as const,
-    messageCount: 1
-  },
-  {
-    groupName: "Gamma Tech - Social Media",
-    clientName: "Pedro Costa",
-    lastMessage: "Obrigado pelo post! Ficou perfeito",
-    waitingTime: "1h 30min",
-    priority: "low" as const,
-    messageCount: 2
   }
 ];
 
@@ -129,7 +107,32 @@ const mockGroups = [
   }
 ];
 
+type Alert = {
+  groupName: string;
+  clientName: string;
+  lastMessage: string;
+  waitingTime: string;
+  priority: "low" | "medium" | "high";
+  messageCount: number;
+};
+
+
+
 export default function Dashboard() {
+
+const [alerts, setAlerts] = useState<Alert[]>([]);
+
+useEffect(() => {
+  const fetchAlerts = async () => {
+    const result = await getAlerts();
+    setAlerts(result);
+  };
+
+  fetchAlerts();
+}, []);
+
+console.log(alerts);
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -160,9 +163,9 @@ export default function Dashboard() {
             <AlertTriangle className="h-5 w-5 text-warning" />
             Alertas Urgentes
           </h2>
-          {mockAlerts.map((alert, index) => (
+          {alerts.map((alert, index) => (
             <AlertCard key={index} {...alert} />
-          ))}
+            ))}
         </div>
 
         {/* Gráficos - 2/3 da tela */}

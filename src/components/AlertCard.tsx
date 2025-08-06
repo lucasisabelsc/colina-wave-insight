@@ -7,8 +7,14 @@ import { cn } from "@/lib/utils";
 interface AlertCardProps {
   groupName: string;
   clientName: string;
-  lastMessage: string;
-  waitingTime: string;
+  lastMessage: {
+    text: string;
+    timestamp: string;
+  };
+  waitingTime: {
+    value: number;
+    unit: "minutes" | string;
+  };
   priority: "high" | "medium" | "low";
   messageCount: number;
 }
@@ -62,14 +68,18 @@ export function AlertCard({
         </div>
         
         <div className="text-sm text-foreground bg-muted/30 p-2 rounded">
-          "{lastMessage}"
+        "{lastMessage.text}"
         </div>
         
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1 text-muted-foreground">
             <Clock className="h-3 w-3" />
-            <span>Aguardando há {waitingTime}</span>
-          </div>
+              <span>
+                Aguardando há{" "}
+                {Math.floor(waitingTime.value / 60) > 0 && `${Math.floor(waitingTime.value / 60)}h `}
+                {waitingTime.value % 60}min
+              </span>
+            </div>
           <div className="flex items-center gap-1 text-muted-foreground">
             <MessageSquare className="h-3 w-3" />
             <span>{messageCount} msg{messageCount !== 1 ? 's' : ''}</span>
