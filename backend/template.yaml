@@ -75,3 +75,28 @@ Resources:
             Path: /metrics/today
             Method: get
             RestApiId: !Ref CrmApi
+  
+  
+  GroupsOverviewFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: groupsOverview/
+      Handler: app.lambda_handler
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: "*"
+      Events:
+        GroupsOverviewGet:
+          Type: Api
+          Properties:
+            Path: /groups/overview
+            Method: get
+            RestApiId: !Ref CrmApi

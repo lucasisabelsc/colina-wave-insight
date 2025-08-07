@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { getAlerts } from "@/services/alerts";
 import { getTodayMetrics } from "@/services/metricsToday";
+import { getGroupsOverview } from "@/services/groups";
 
 
 
@@ -160,6 +161,15 @@ type TodayMetricsResponse = {
   };
 };
 
+export type GroupOverview = {
+  id: string;
+  name: string;
+  todayMessages: number;
+  avgResponseTime: string;
+  lastActivity: string;
+  status: "active" | "idle" | "waiting";
+};
+
 export default function Dashboard() {
 
 const [metrics, setMetrics] = useState<TodayMetricsResponse["metrics"] | null>(null);  
@@ -182,6 +192,17 @@ useEffect(() => {
   };
 
   fetchAlerts();
+}, []);
+
+const [groups, setGroups] = useState<GroupOverview[]>([]);
+
+useEffect(() => {
+  const fetchGroups = async () => {
+    const res = await getGroupsOverview();
+    setGroups(res);
+  };
+
+  fetchGroups();
 }, []);
 
 console.log(metrics);
@@ -264,7 +285,7 @@ console.log(metrics);
       </div>
 
       {/* Tabela de Grupos */}
-      <GroupsTable groups={mockGroups} />
+      <GroupsTable groups={groups} />
     </div>
   );
 }

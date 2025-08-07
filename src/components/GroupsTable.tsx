@@ -9,12 +9,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Users, Clock, TrendingUp } from "lucide-react";
+import { MessageSquare, Clock, TrendingUp } from "lucide-react";
 
 interface GroupData {
   id: string;
   name: string;
-  members: number;
   todayMessages: number;
   avgResponseTime: string;
   lastActivity: string;
@@ -54,12 +53,6 @@ export function GroupsTable({ groups }: GroupsTableProps) {
               <TableHead>Grupo</TableHead>
               <TableHead className="text-center">
                 <div className="flex items-center justify-center gap-1">
-                  <Users className="h-4 w-4" />
-                  Membros
-                </div>
-              </TableHead>
-              <TableHead className="text-center">
-                <div className="flex items-center justify-center gap-1">
                   <MessageSquare className="h-4 w-4" />
                   Hoje
                 </div>
@@ -85,7 +78,6 @@ export function GroupsTable({ groups }: GroupsTableProps) {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-center">{group.members}</TableCell>
                 <TableCell className="text-center font-semibold">
                   {group.todayMessages}
                 </TableCell>
