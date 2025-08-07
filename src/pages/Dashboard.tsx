@@ -13,6 +13,8 @@ import {
 
 import { useEffect, useState } from "react";
 import { getAlerts } from "@/services/alerts";
+import { getTodayMetrics } from "@/services/metricsToday";
+
 
 
 
@@ -110,15 +112,66 @@ const mockGroups = [
 type Alert = {
   groupName: string;
   clientName: string;
-  lastMessage: string;
-  waitingTime: string;
+  lastMessage: {
+    text: string;
+    timestamp: string;
+  };
+  waitingTime: {
+    value: number;
+    unit: string;
+  };
   priority: "low" | "medium" | "high";
   messageCount: number;
 };
 
 
+type TodayMetricsResponse = {
+  date: string;
+  metrics: {
+    totalMessages: {
+      value: number;
+      change: {
+        value: number;
+        type: "increase" | "decrease";
+      };
+    };
+    averageResponseTime: {
+      value: number;
+      unit: string;
+      change: {
+        value: number;
+        type: "increase" | "decrease";
+      };
+    };
+    activeGroups: {
+      value: number;
+      change: {
+        value: number;
+        type: "increase" | "decrease";
+      };
+    };
+    waitingClients: {
+      value: number;
+      change: {
+        value: number;
+        type: "increase" | "decrease";
+      };
+    };
+  };
+};
 
 export default function Dashboard() {
+
+const [metrics, setMetrics] = useState<TodayMetricsResponse["metrics"] | null>(null);  
+
+useEffect(() => {
+  const fetchMetrics = async () => {
+    const res = await getTodayMetrics();
+    if (res?.metrics) setMetrics(res.metrics);
+  };
+
+  fetchMetrics();
+}, []);
 
 const [alerts, setAlerts] = useState<Alert[]>([]);
 
@@ -131,7 +184,7 @@ useEffect(() => {
   fetchAlerts();
 }, []);
 
-console.log(alerts);
+console.log(metrics);
 
   return (
     <div className="space-y-6 p-6">
@@ -149,11 +202,38 @@ console.log(alerts);
       </div>
 
       {/* Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {mockMetrics.map((metric, index) => (
-          <MetricCard key={index} {...metric} />
-        ))}
-      </div>
+      {metrics && (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <MetricCard
+      title="Total de Mensagens Hoje"
+      value={metrics.totalMessages.value.toLocaleString()}
+      change={metrics.totalMessages.change}
+      icon={MessageSquare}
+      variant="success"
+    />
+    <MetricCard
+      title="Tempo Médio de Resposta"
+      value={`${metrics.averageResponseTime.value} ${metrics.averageResponseTime.unit}`}
+      change={metrics.averageResponseTime.change}
+      icon={Clock}
+      variant="warning"
+    />
+    <MetricCard
+      title="Grupos Ativos"
+      value={metrics.activeGroups.value.toString()}
+      change={metrics.activeGroups.change}
+      icon={Users}
+      variant="default"
+    />
+    <MetricCard
+      title="Clientes Aguardando"
+      value={metrics.waitingClients.value.toString()}
+      change={metrics.waitingClients.change}
+      icon={AlertTriangle}
+      variant="destructive"
+    />
+  </div>
+)}
 
       {/* Alertas e Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

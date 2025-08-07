@@ -1,7 +1,6 @@
 import boto3
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
-import statistics
 import json
 
 dynamodb = boto3.resource('dynamodb')
@@ -24,67 +23,70 @@ def get_priority(waiting_minutes):
         return "low"
 
 def get_group_name(group_id):
-    print(f"🔍 Buscando nome do grupo para groupId: {group_id}")
     try:
         res = groups_table.get_item(Key={"groupId": group_id})
-        item = res.get("Item", {})
-        print(f"✅ Resultado encontrado: {item}")
-        return item.get("groupName", "")
-    except Exception as e:
-        print(f"⚠️ Erro ao buscar groupName para {group_id}: {e}")
+        return res.get("Item", {}).get("groupName", "")
+    except Exception:
         return ""
 
 def lambda_handler(event, context):
-    print(f"🚀 Evento recebido: {json.dumps(event)}")
-    
+    print("🔄 Iniciando execução da Lambda")
+
     query = event.get("queryStringParameters") or {}
     limit = int(query.get("limit", 10))
     priority_filter = query.get("priority")
-    
-    print(f"🔎 Parâmetros extraídos - limit: {limit}, priority_filter: {priority_filter}")
 
+    # Carrega todas as mensagens
     response = messages_table.scan(Limit=500)
     items = response["Items"]
-    print(f"📥 Mensagens recuperadas: {len(items)}")
+    print(f"📥 Total de mensagens recebidas: {len(items)}")
 
-    client_messages = [item for item in items if item.get("direction") == "client"]
-    print(f"📨 Mensagens filtradas de clientes: {len(client_messages)}")
-
-    grouped_alerts = defaultdict(list)
-    for msg in client_messages:
-        group_id = msg.get("groupId")
-        grouped_alerts[group_id].append(msg)
-
-    print(f"📦 Grupos identificados: {len(grouped_alerts)}")
+    # Agrupa mensagens por groupId
+    grouped_messages = defaultdict(list)
+    for msg in items:
+        grouped_messages[msg["groupId"]].append(msg)
 
     alerts = []
-    now = datetime.now(timezone.utc)
-    now = now - timedelta(hours=3)  # ✅ Usa UTC corretamente
+    now = datetime.now(timezone.utc) - timedelta(hours=3)  # ajustar para fuso -3
 
-    for group_id, msgs in grouped_alerts.items():
-        sorted_msgs = sorted(msgs, key=lambda m: m["timestamp"])
-        first_msg = sorted_msgs[0]
+    for group_id, msgs in grouped_messages.items():
+        msgs_sorted = sorted(msgs, key=lambda m: m["timestamp"])
 
-        # ✅ timestamp vem em UTC ("Z"), então mantemos o cálculo em UTC
-        msg_time = datetime.fromisoformat(first_msg["timestamp"].replace("Z", "+00:00"))
+        # Última mensagem do cliente
+        last_client_msg = None
+        for msg in reversed(msgs_sorted):
+            if msg.get("direction") == "client":
+                last_client_msg = msg
+                break
 
-        waiting_minutes = int((now - msg_time).total_seconds() / 60)
+        if not last_client_msg:
+            continue  # nenhuma mensagem do cliente nesse grupo
+
+        # Verifica se houve resposta do time depois da última do cliente
+        client_time = datetime.fromisoformat(last_client_msg["timestamp"].replace("Z", "+00:00"))
+        responded = any(
+            msg.get("direction") == "team" and
+            datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00")) > client_time
+            for msg in msgs_sorted
+        )
+
+        if responded:
+            continue  # já foi respondido
+
+        waiting_minutes = int((now - client_time).total_seconds() / 60)
         priority = get_priority(waiting_minutes)
 
-        print(f"🧮 GroupId: {group_id}, Tempo de espera: {waiting_minutes} min, Prioridade: {priority}")
-
         if priority_filter and priority != priority_filter:
-            print(f"⏩ Ignorado por prioridade (esperada: {priority_filter}, atual: {priority})")
             continue
 
         alert = {
-            "id": first_msg["messageId"],
+            "id": last_client_msg["messageId"],
             "groupId": group_id,
             "groupName": get_group_name(group_id),
-            "clientName": json.loads(first_msg["from"]).get("name"),
+            "clientName": json.loads(last_client_msg["from"]).get("name"),
             "lastMessage": {
-                "text": json.loads(first_msg["content"]).get("text"),
-                "timestamp": first_msg["timestamp"]
+                "text": json.loads(last_client_msg["content"]).get("text"),
+                "timestamp": last_client_msg["timestamp"]
             },
             "waitingTime": {
                 "value": waiting_minutes,
@@ -94,9 +96,11 @@ def lambda_handler(event, context):
             "messageCount": len(msgs)
         }
 
-        print(f"✅ Alerta adicionado: {json.dumps(alert)}")
         alerts.append(alert)
 
+    print(f"📦 Total de alertas gerados: {len(alerts)}")
+
+    # Ordenar por prioridade e tempo
     priority_order = {"high": 1, "medium": 2, "low": 3}
     alerts.sort(key=lambda x: (priority_order[x["priority"]], -x["waitingTime"]["value"]))
 
@@ -106,8 +110,6 @@ def lambda_handler(event, context):
         "page": 1,
         "hasMore": len(alerts) > limit
     }
-
-    print(f"📤 Resultado final: {json.dumps(result)}")
 
     return {
         "statusCode": 200,

@@ -47,7 +47,7 @@ def extrair_metricas_por_dia(mensagens, data_referencia):
     for msgs in por_grupo.values():
         msgs.sort()
         for i in range(len(msgs) - 1):
-            if msgs[i][1] == 'client' and msgs[i+1][1] == 'agent':
+            if msgs[i][1] == 'client' and msgs[i+1][1] == 'team':
                 delta = (msgs[i+1][0] - msgs[i][0]).total_seconds() / 60
                 if 0 < delta < 180:
                     tempos_resposta.append(delta)
@@ -95,6 +95,8 @@ def lambda_handler(event, context):
             }
         }
     }
+
+    print(response_body)
 
     return {
         "statusCode": 200,
