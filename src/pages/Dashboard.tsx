@@ -178,7 +178,7 @@ export default function Dashboard() {
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
             <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
-          Dashboard Analytics
+          Dashboard WhatsApp Analytics
         </h1>
         <p className="text-muted-foreground">
           Monitoramento em tempo real dos grupos WhatsApp do Studio Colina
