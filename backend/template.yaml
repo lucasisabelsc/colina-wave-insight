@@ -100,3 +100,51 @@ Resources:
             Path: /groups/overview
             Method: get
             RestApiId: !Ref CrmApi
+
+  ActivityHourlyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: activity/
+      Handler: hourly.lambda_handler
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: "*"
+      Events:
+        ActivityHourlyGet:
+          Type: Api
+          Properties:
+            Path: /activity/hourly
+            Method: get
+            RestApiId: !Ref CrmApi
+
+  ActivityWeeklyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: activity/
+      Handler: weekly.lambda_handler
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: "*"
+      Events:
+        ActivityWeeklyGet:
+          Type: Api
+          Properties:
+            Path: /activity/weekly
+            Method: get
+            RestApiId: !Ref CrmApi

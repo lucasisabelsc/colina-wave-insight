@@ -4,6 +4,9 @@ import boto3
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 import json
+from rapidfuzz import fuzz
+import unicodedata
+import re
 
 dynamodb = boto3.resource('dynamodb')
 messages_table = dynamodb.Table('crm-mensagens')
@@ -15,6 +18,38 @@ CORS_HEADERS = {
     "Access-Control-Allow-Methods": "OPTIONS,GET,POST,PUT,DELETE,PATCH",
     "Access-Control-Allow-Headers": "*"
 }
+
+IGNORED_MESSAGES = ["ok", "obrigado", "obrigada", "valeu", "vlw", "tks", "thanks"," obrigado(a)", "obrigadão", "tudo certo", "tudo bem", "tudo tranquilo", "tudo ok", "tudo beleza"]
+
+MIN_WAIT_MINUTES = 10
+
+def normalize_text(text):
+    text = text.lower().strip()
+    text = "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
+    text = re.sub(r"[^\w\s]", "", text)  # remove pontuação
+    return text
+
+def is_irrelevant_message(text):
+    if not text:
+        return True
+
+    norm = normalize_text(text)
+
+    for term in IGNORED_MESSAGES:
+        norm_term = normalize_text(term)
+
+        # 1️⃣ Similaridade alta → irrelevante
+        if fuzz.ratio(norm, norm_term) > 85:
+            return True
+
+        # 2️⃣ Termo presente como palavra isolada → irrelevante
+        if re.search(rf"\b{re.escape(norm_term)}\b", norm):
+            return True
+
+    return False
 
 def get_priority(waiting_minutes):
     if waiting_minutes >= 120:
@@ -58,8 +93,20 @@ def lambda_handler(event, context):
         last_client_msg = None
         for msg in reversed(msgs_sorted):
             if msg.get("direction") == "client":
-                last_client_msg = msg
-                break
+                client_time = datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
+                diff_minutes = int((now - client_time).total_seconds() / 60)
+
+                text = json.loads(msg["content"]).get("text", "")
+
+                # Se já passou do tempo mínimo, aplicar filtro de relevância
+                if diff_minutes >= MIN_WAIT_MINUTES:
+                    if not is_irrelevant_message(text):
+                        last_client_msg = msg
+                        break
+                else:
+                    # Mensagem recente — sempre entra como relevante
+                    last_client_msg = msg
+                    break
 
         if not last_client_msg:
             continue  # nenhuma mensagem do cliente nesse grupo
