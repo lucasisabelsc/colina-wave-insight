@@ -22,11 +22,11 @@ import { Skeleton } from "@/components/ui/skeleton"; // se não tiver, dá pra t
 
 // === Config de refetch (ms) ===
 const REFETCH = {
-  metrics: 60_000,        // 60s
-  alerts: 30_000,         // 30s
-  groups: 60_000,         // 60s
-  hourly: 120_000,        // 120s
-  weekly: 300_000,        // 5min
+  metrics: 600_000,        // 10min
+  alerts: 600_000,         // 10min
+  groups: 600_000,         // 10min
+  hourly: 600_000,         // 10min
+  weekly: 600_000,         // 10min
 };
 
 type Alert = {
