@@ -7,15 +7,27 @@ import {
   Clock, 
   Users, 
   AlertTriangle,
-  Zap
+  Zap,
+  RefreshCw
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getAlerts } from "@/services/alerts";
 import { getTodayMetrics } from "@/services/metricsToday";
 import { getGroupsOverview } from "@/services/groups";
 import { getActivityHourly } from "@/services/hourly";
 import { getActivityWeekly } from "@/services/weekly";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton"; // se não tiver, dá pra trocar por <div className="h-... animate-pulse bg-muted rounded" />
+
+// === Config de refetch (ms) ===
+const REFETCH = {
+  metrics: 60_000,        // 60s
+  alerts: 30_000,         // 30s
+  groups: 60_000,         // 60s
+  hourly: 120_000,        // 120s
+  weekly: 300_000,        // 5min
+};
 
 type Alert = {
   groupName: string;
@@ -37,32 +49,20 @@ type TodayMetricsResponse = {
   metrics: {
     totalMessages: {
       value: number;
-      change: {
-        value: number;
-        type: "increase" | "decrease";
-      };
+      change: { value: number; type: "increase" | "decrease" };
     };
     averageResponseTime: {
       value: number;
       unit: string;
-      change: {
-        value: number;
-        type: "increase" | "decrease";
-      };
+      change: { value: number; type: "increase" | "decrease" };
     };
     activeGroups: {
       value: number;
-      change: {
-        value: number;
-        type: "increase" | "decrease";
-      };
+      change: { value: number; type: "increase" | "decrease" };
     };
     waitingClients: {
       value: number;
-      change: {
-        value: number;
-        type: "increase" | "decrease";
-      };
+      change: { value: number; type: "increase" | "decrease" };
     };
   };
 };
@@ -79,114 +79,138 @@ type GroupOverview = {
 type HourlyActivityItem = {
   hour: string;
   messages: number;
-  responseTime: {
-    average: number;
-    unit: string;
-  };
+  responseTime: { average: number; unit: string };
 };
-
 type HourlyActivityResponse = {
   date: string;
   data: HourlyActivityItem[];
-  summary: {
-    totalMessages: number;
-    averageResponseTime: number;
-  };
+  summary: { totalMessages: number; averageResponseTime: number };
 };
 
 type WeeklyActivityItem = {
   date: string;
   dayOfWeek: string;
   messages: number;
-  responseTime: {
-    average: number;
-    unit: string;
-  };
+  responseTime: { average: number; unit: string };
 };
-
 type WeeklyActivityResponse = {
-  period: {
-    start: string;
-    end: string;
-  };
+  period: { start: string; end: string };
   data: WeeklyActivityItem[];
-  summary: {
-    totalMessages: number;
-    averageResponseTime: number;
-  };
+  summary: { totalMessages: number; averageResponseTime: number };
 };
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState<TodayMetricsResponse["metrics"] | null>(null);  
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [groups, setGroups] = useState<GroupOverview[]>([]);
-  const [hourlyActivity, setHourlyActivity] = useState<HourlyActivityResponse | null>(null);
-  const [weeklyActivity, setWeeklyActivity] = useState<WeeklyActivityResponse | null>(null);
+  // Datas derivadas (mantidas aqui para as queries)
+  const today = new Date().toISOString().split("T")[0];
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 6);
+  const startDate = start.toISOString().split("T")[0];
+  const endDate = end.toISOString().split("T")[0];
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      const res = await getTodayMetrics();
-      if (res?.metrics) setMetrics(res.metrics);
-    };
-    fetchMetrics();
-  }, []);
+  // Metrics
+  const {
+    data: metricsRes,
+    isLoading: metricsLoading,
+    isFetching: metricsFetching,
+    refetch: refetchMetrics,
+  } = useQuery<TodayMetricsResponse>({
+    queryKey: ["todayMetrics"],
+    queryFn: getTodayMetrics,
+    refetchInterval: REFETCH.metrics,
+  });
+  const metrics = metricsRes?.metrics ?? null;
 
-  useEffect(() => {
-    const fetchAlerts = async () => {
-      const result = await getAlerts();
-      setAlerts(result);
-    };
-    fetchAlerts();
-  }, []);
+  // Alerts
+  const {
+    data: alerts = [],
+    isLoading: alertsLoading,
+    isFetching: alertsFetching,
+    refetch: refetchAlerts,
+  } = useQuery<Alert[]>({
+    queryKey: ["alerts"],
+    queryFn: getAlerts,
+    refetchInterval: REFETCH.alerts,
+  });
 
-  useEffect(() => {
-    const fetchGroups = async () => {
-      const res = await getGroupsOverview();
-      setGroups(res);
-    };
-    fetchGroups();
-  }, []);
+  // Groups overview
+  const {
+    data: groups = [],
+    isLoading: groupsLoading,
+    isFetching: groupsFetching,
+    refetch: refetchGroups,
+  } = useQuery<GroupOverview[]>({
+    queryKey: ["groupsOverview"],
+    queryFn: getGroupsOverview,
+    refetchInterval: REFETCH.groups,
+  });
 
-  useEffect(() => {
-    const fetchHourly = async () => {
-      const today = new Date().toISOString().split("T")[0];
-      const res = await getActivityHourly(today);
-      if (res) setHourlyActivity(res);
-    };
-    fetchHourly();
-  }, []);
+  // Hourly activity (hoje)
+  const {
+    data: hourlyActivity,
+    isLoading: hourlyLoading,
+    isFetching: hourlyFetching,
+    refetch: refetchHourly,
+  } = useQuery<HourlyActivityResponse | null>({
+    queryKey: ["activityHourly", today],
+    queryFn: () => getActivityHourly(today),
+    refetchInterval: REFETCH.hourly,
+  });
 
-  useEffect(() => {
-    const fetchWeekly = async () => {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - 6); // últimos 7 dias
-      const res = await getActivityWeekly(
-        start.toISOString().split("T")[0],
-        end.toISOString().split("T")[0]
-      );
-      if (res) setWeeklyActivity(res);
-    };
-    fetchWeekly();
-  }, []);
+  // Weekly activity (últimos 7 dias)
+  const {
+    data: weeklyActivity,
+    isLoading: weeklyLoading,
+    isFetching: weeklyFetching,
+    refetch: refetchWeekly,
+  } = useQuery<WeeklyActivityResponse | null>({
+    queryKey: ["activityWeekly", startDate, endDate],
+    queryFn: () => getActivityWeekly(startDate, endDate),
+    refetchInterval: REFETCH.weekly,
+  });
+
+  const anyFetching = metricsFetching || alertsFetching || groupsFetching || hourlyFetching || weeklyFetching;
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchMetrics(),
+      refetchAlerts(),
+      refetchGroups(),
+      refetchHourly(),
+      refetchWeekly(),
+    ]);
+  };
 
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <Zap className="h-4 w-4 text-primary-foreground" />
-          </div>
-          Dashboard WhatsApp Analytics
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+              <Zap className="h-4 w-4 text-primary-foreground" />
+            </div>
+            Dashboard WhatsApp Analytics
+          </h1>
+
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            disabled={anyFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${anyFetching ? "animate-spin" : ""}`} />
+            {anyFetching ? "Atualizando..." : "Atualizar agora"}
+          </Button>
+        </div>
+
         <p className="text-muted-foreground">
           Monitoramento em tempo real dos grupos WhatsApp do Studio Colina
         </p>
       </div>
 
       {/* Métricas Principais */}
-      {metrics && (
+      {metrics ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Total de Mensagens Hoje"
@@ -217,6 +241,20 @@ export default function Dashboard() {
             variant="destructive"
           />
         </div>
+      ) : (
+        // Skeleton das métricas
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 rounded-lg border bg-card shadow-card">
+              <Skeleton className="h-4 w-24 mb-3" />
+              <Skeleton className="h-8 w-32" />
+              <div className="mt-4 flex items-center gap-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-3 w-10" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Alertas e Gráficos */}
@@ -227,39 +265,82 @@ export default function Dashboard() {
             <AlertTriangle className="h-5 w-5 text-warning" />
             Alertas Urgentes
           </h2>
-          {alerts.map((alert, index) => (
-            <AlertCard key={index} {...alert} />
-          ))}
+
+          {alertsLoading ? (
+            // Skeleton de alertas
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-lg border bg-card shadow-card space-y-3">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-full" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-12" />
+                </div>
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))
+          ) : (
+            alerts.map((alert, index) => <AlertCard key={index} {...alert} />)
+          )}
         </div>
 
         {/* Gráficos - 2/3 da tela */}
         <div className="lg:col-span-2 space-y-6">
-          {hourlyActivity && (
-            <ActivityChart
-              title="Atividade por Horário (Hoje)"
-              data={hourlyActivity.data.map(item => ({
-                name: item.hour,
-                value: item.messages,
-                responseTime: item.responseTime.average
-              }))}
-              type="area"
-            />
+          {hourlyLoading ? (
+            <div className="rounded-lg border bg-card p-4">
+              <Skeleton className="h-5 w-60 mb-4" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            hourlyActivity && (
+              <ActivityChart
+                title="Atividade por Horário (Hoje)"
+                data={hourlyActivity.data.map((item) => ({
+                  name: item.hour,
+                  value: item.messages,
+                  responseTime: item.responseTime.average,
+                }))}
+                type="area"
+              />
+            )
           )}
-          {weeklyActivity && (
-            <ActivityChart
-              title="Mensagens por Dia da Semana"
-              data={weeklyActivity.data.map(item => ({
-                name: item.dayOfWeek,
-                value: item.messages
-              }))}
-              type="bar"
-            />
+
+          {weeklyLoading ? (
+            <div className="rounded-lg border bg-card p-4">
+              <Skeleton className="h-5 w-72 mb-4" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            weeklyActivity && (
+              <ActivityChart
+                title="Mensagens por Dia da Semana"
+                data={weeklyActivity.data.map((item) => ({
+                  name: item.dayOfWeek,
+                  value: item.messages,
+                }))}
+                type="bar"
+              />
+            )
           )}
         </div>
       </div>
 
       {/* Tabela de Grupos */}
-      <GroupsTable groups={groups} />
+      {groupsLoading ? (
+        <div className="rounded-lg border bg-card p-4">
+          <Skeleton className="h-5 w-48 mb-4" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-3 border-b last:border-b-0">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <GroupsTable groups={groups} />
+      )}
     </div>
   );
 }
