@@ -1,0 +1,15 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-colinawaveinsight-dev-49c22-authRole",
+      "UnauthRoleArn": "arn:aws:iam::442042552948:role/amplify-colinawaveinsight-dev-49c22-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::442042552948:role/amplify-colinawaveinsight-dev-49c22-authRole",
+      "Region": "us-east-2",
+      "DeploymentBucketName": "amplify-colinawaveinsight-dev-49c22-deployment",
+      "UnauthRoleName": "amplify-colinawaveinsight-dev-49c22-unauthRole",
+      "StackName": "amplify-colinawaveinsight-dev-49c22",
+      "StackId": "arn:aws:cloudformation:us-east-2:442042552948:stack/amplify-colinawaveinsight-dev-49c22/f8d68bf0-7493-11f0-84d3-06dd7c4c7d95",
+      "AmplifyAppId": "d36023gz3efzs6"
+    }
+  }
+}
